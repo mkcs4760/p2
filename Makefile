@@ -4,10 +4,13 @@ RM = rm -f
 
 default: all
 
-all: p2
+all: oss user
 
-p2: p2.c
-	$(CC) $(CFLAGS) -o p2 p2.c
+oss: oss.c
+	$(CC) $(CFLAGS) -o oss oss.c
+	
+user: user.c
+	$(CC) $(CFLAGS) -o user user.c
 
 clean veryclean:
-	$(RM) p2
+	$(RM) oss user
