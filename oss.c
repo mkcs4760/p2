@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/wait.h>
 #include <unistd.h> //used for sleep right now
 
 //#define SHSIZE 100
@@ -36,13 +37,55 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 	
+	pid_t pid;
+	pid = fork();
+	if (pid > 0) {//parent
+		printf("I am the parent\n");
+		wait(NULL);
+		printf("Parent done waiting\n");
+
+		
+		//memcpy(shm, "Hello World", 11); //write something to shared memory
+		*clockSeconds = 0;
+		*clockNano = 0;
+	
+		//s = shm;
+		//s += 11; //the pointer is now at the end of the string we put in shared memory
+		//*s = 0; //add terminating 0 at end of string
+		printf("Hello from OSS!\n");
+		while(*clockSeconds != 3) {
+			*clockNano += clockInc;
+			if (*clockNano >= 1000000000) { //increment the next unit
+				*clockSeconds += 1;
+				*clockNano -= 1000000000;
+			}
+			//printf("OSS time: %d:%d\n", *clockSeconds, *clockNano);
+			//printf("From oss, clockSeconds = %d\n", *clockSeconds);
+			sleep(1);
+		}
+	
+		int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+		if (ctl_return == -1) {
+			perror("shmctl for removel: ");
+			exit(1);
+		}
+		//continue;
+	}
+	else if (pid == 0) { //child
+		printf("I am the child\n");
+		sleep(4);
+		printf("Child process complete\n");
+	}
+	else {
+		perror("Error, could not fork child: ");
+		exit(1);
+	}
+	
+	/*
 	//memcpy(shm, "Hello World", 11); //write something to shared memory
 	*clockSeconds = 0;
 	*clockNano = 0;
 	
-	//s = shm;
-	//s += 11; //the pointer is now at the end of the string we put in shared memory
-	//*s = 0; //add terminating 0 at end of string
 	printf("Hello from OSS!\n");
 	while(*clockSeconds != 3) {
 		*clockNano += clockInc;
@@ -60,6 +103,7 @@ int main(int argc, char *argv[]) {
 		perror("shmctl for removel: ");
 		exit(1);
 	}
+	*/
 	
 	return 0;
 }
