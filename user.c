@@ -16,10 +16,10 @@ int main(int argc, char *argv[]) {
 	key_t key;
 	//char * shm;
 	//char *s;
-	int *a, *b;
+	int *clockSeconds, *clockNano;
 	
 	key = 9876;
-	shmid = shmget(key, 2*sizeof(int*), 0666);
+	shmid = shmget(key, sizeof(int*) + sizeof(long*), 0666);
 	
 	if(shmid < 0) {
 		perror("shmget user side");
@@ -27,17 +27,17 @@ int main(int argc, char *argv[]) {
 	}
 	
 	//shm = shmat(shmid, NULL, 0); //attach ourselves to that shared memory
-	a = shmat(shmid, NULL, 0); //attempting to store 2 integers in shared memory
-	b = a + 1;
+	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 integers in shared memory
+	clockNano = clockSeconds + 1;
 	
-	if((*a == -1) || (*b == -1)) {
+	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
 		perror("shmat");
 		exit(1);
 	}
+	
 	printf("Hello from user!\n");
-	while(*a != 25) {
-		//printf("%d  %d", *a, *b);
-		printf("From user, a = %d\n", *a);		
+	while(*clockSeconds != 3) {
+		printf("User time: %d:%d\n", *clockSeconds, *clockNano);		
 		sleep(1);
 	}
 	

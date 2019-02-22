@@ -15,10 +15,11 @@ int main(int argc, char *argv[]) {
 	key_t key;
 	//char * shm;
 	//char *s;
-	int *a, *b;
+	int *clockSeconds, *clockNano;
+	long clockInc = 100000001; //just as an example. Will eventually read from input file
 	
 	key = 9876;
-	shmid = shmget(key, 2*sizeof(int*), IPC_CREAT | 0666); //this is where we create shared memory
+	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
 	
 	if(shmid < 0) {
 		perror("shmget oss side");
@@ -27,25 +28,30 @@ int main(int argc, char *argv[]) {
 	
 	//shm = shmat(shmid, NULL, 0); //attach ourselves to that shared memory
 
-	a = shmat(shmid, NULL, 0); //attempting to store 2 integers in shared memory
-	b = a + 1;
+	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 integers in shared memory
+	clockNano = clockSeconds + 1;
 	
-	if((a == (int *) -1) || (b == (int *) -1)) {
+	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
 		perror("shmat");
 		exit(1);
 	}
 	
 	//memcpy(shm, "Hello World", 11); //write something to shared memory
-	*a = 1;
-	*b = 46;
+	*clockSeconds = 0;
+	*clockNano = 0;
 	
 	//s = shm;
 	//s += 11; //the pointer is now at the end of the string we put in shared memory
 	//*s = 0; //add terminating 0 at end of string
 	printf("Hello from OSS!\n");
-	while(*a != 25) {
-		*a += 1;
-		printf("From oss, a = %d\n", *a);
+	while(*clockSeconds != 3) {
+		*clockNano += clockInc;
+		if (*clockNano >= 1000000000) { //increment the next unit
+			*clockSeconds += 1;
+			*clockNano -= 1000000000;
+		}
+		//printf("OSS time: %d:%d\n", *clockSeconds, *clockNano);
+		//printf("From oss, clockSeconds = %d\n", *clockSeconds);
 		sleep(1);
 	}
 	
