@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 	
 		*clockSeconds = 0;
 		*clockNano = 0;
-	
+		//sleep(0.5);
 		printf("Hello from OSS!\n");
 		while(*clockSeconds != 3) {
 			*clockNano += clockInc;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 			}
 			//printf("OSS time: %d:%d\n", *clockSeconds, *clockNano);
 			//printf("From oss, clockSeconds = %d\n", *clockSeconds);
-			sleep(1);
+			sleep(1); //this just represents the main loop doing something
 		}
 	
 		int ctl_return = shmctl(shmid, IPC_RMID, NULL);
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 	else if (pid == 0) { //child
 		printf("I am the child\n");
 		//sleep(4);
-		execl ("user", "user", NULL);
+		execl ("user", "user", "200", NULL);
 		perror("Error, execl function failed: ");
 		exit(1);
 	}
