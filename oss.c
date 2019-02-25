@@ -12,11 +12,58 @@
 #include <unistd.h> 
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
+#include <sys/time.h>
+
+int shmid;
+
+static void myhandler(int s) {
+    char message[41] = "Program reached 2 second limit. Program ";
+    int errsave;
+    errsave = errno;
+    write(STDERR_FILENO, &message, 40);
+    errno = errsave;
+   
+    //destroy shared memory
+	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+	if (ctl_return == -1) {
+		perror("shmctl for removel: ");
+		exit(1);
+	}
+   
+   kill(-1*getpid(), SIGKILL);
+}
+//function taken from textbook as instructed by professor
+static int setupinterrupt(void) {          /* set up myhandler for  SIGPROF */
+    struct sigaction act;
+    act.sa_handler = myhandler;
+    act.sa_flags = 0;
+    return (sigemptyset(&act.sa_mask) || sigaction(SIGPROF, &act, NULL));
+}
+//function taken from textbook as instructed by professor
+static int setupitimer(void) {    /* set ITIMER_PROF for 2-second intervals */
+    struct itimerval value;
+    value.it_interval.tv_sec = 1;
+    value.it_interval.tv_usec = 0;
+    value.it_value = value.it_interval;
+    return (setitimer(ITIMER_PROF, &value, NULL));
+}
+
 
 int main(int argc, char *argv[]) {
 	
+    if (setupinterrupt()) {
+		perror("Failed to set up handler for SIGPROF");
+		return 1;
+    }
+    if (setupitimer() == -1) {
+		perror("Failed to set up the ITIMER_PROF interval timer"); 
+		return 1;
+    }
+	
+	
 	printf("Begin the oss code\n");
-	int shmid;
+	//int shmid;
 	key_t key;
 	int *clockSeconds, *clockNano;
 	long clockInc = 10001; //just as an example. Will eventually read from input file
@@ -38,7 +85,7 @@ int main(int argc, char *argv[]) {
 
 	*clockSeconds = 0;
 	*clockNano = 0;
-	int makeChild = 10; //sample trigger, let's us know if we need to fork off another child or not
+	int makeChild = 10000; //sample trigger, let's us know if we need to fork off another child or not
 	//sleep(0.5);
 	printf("Hello from OSS!\n");
 	//int status;
@@ -64,12 +111,12 @@ int main(int argc, char *argv[]) {
 		temp = waitpid(0, NULL, WNOHANG);
 		//printf("temp equals %d\n", temp);
 		if (temp > 0) {
-			printf("A child has ended\n");
+			//printf("A child has ended\n");
 			makeChild -= 1;
 		}
 		if (temp > 0 || temp < 0){ //if a child has ended or if no child is running
 			if (makeChild > 0) {
-				printf("Lets make a child!\n");
+				//printf("Lets make a child!\n");
 				//makeChild -= 1;
 				pid_t pid;
 				pid = fork();

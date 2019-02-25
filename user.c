@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 	
-	printf("Hello from user! We're at time %d:%d\n", *clockSeconds, *clockNano);
+	//printf("Hello from user! We're at time %d:%d\n", *clockSeconds, *clockNano);
 	//while(*clockSeconds != 2) {
 	//	printf("User time: %d:%d\n", *clockSeconds, *clockNano);		
 	//}
