@@ -43,7 +43,7 @@ static int setupinterrupt(void) {          /* set up myhandler for  SIGPROF */
 //function taken from textbook as instructed by professor
 static int setupitimer(void) {    /* set ITIMER_PROF for 2-second intervals */
     struct itimerval value;
-    value.it_interval.tv_sec = 1;
+    value.it_interval.tv_sec = 2;
     value.it_interval.tv_usec = 0;
     value.it_value = value.it_interval;
     return (setitimer(ITIMER_PROF, &value, NULL));
@@ -51,7 +51,7 @@ static int setupitimer(void) {    /* set ITIMER_PROF for 2-second intervals */
 
 
 int main(int argc, char *argv[]) {
-	
+	//set up 2 second timer first thing
     if (setupinterrupt()) {
 		perror("Failed to set up handler for SIGPROF");
 		return 1;
@@ -60,6 +60,64 @@ int main(int argc, char *argv[]) {
 		perror("Failed to set up the ITIMER_PROF interval timer"); 
 		return 1;
     }
+	
+	char inputFileName[] = "input.txt";
+	char outputFileName[] = "output.txt";
+	int maxKidsTotal = 4;
+	int maxKidsAtATime = 2;
+	
+	//need to add code to allow us to print program name in error messages
+	
+	//process getopt arguments
+	
+
+	
+	int option;
+	while ((option = getopt(argc, argv, "hn:s:i:o:")) != -1) {
+		switch (option) {
+			case 'h' :	printf("Help page for OS_Klein_project2\n"); //for h, we print data to the screen
+						printf("Blah blah blah write stuff here\n");
+						//WRITE STUFF HERE BEFORE YOU SUBMIT!!
+						exit(0);
+						break;
+			case 'n' :	maxKidsTotal = *optarg;
+						break;
+			case 's' :	if (*optarg < 20) {
+							maxKidsAtATime = *optarg;
+						}
+						else {
+							perror("Cannot allow more then 20 process at a time.");
+							exit(1);
+						}
+						break;
+			case 'i' :	strcpy(inputFileName, optarg); //for i, we specify input file name
+						break;
+			case 'o' :	strcpy(outputFileName, optarg); //for o, we specify output file name
+						break;
+			default :	errno = 22; //anything else is an invalid argument
+						perror("You entered an invalid argument");
+						exit(1);
+		}
+	}
+	
+	
+	
+	
+	//open input file
+	FILE *input;
+	input = fopen(inputFileName, "r");
+	if (input == NULL) {
+		printf("Can't open file %s\n", inputFileName);
+		perror("Can't open file");
+		exit(1);
+	}
+	printf("Opened file %s\n", inputFileName);
+		
+	
+	
+	
+	
+	
 	
 	
 	printf("Begin the oss code\n");
@@ -91,11 +149,6 @@ int main(int argc, char *argv[]) {
 	//int status;
 	int temp;
 	while(makeChild > 0) { //simulated clock is incremented by parent
-
-		//printf("makeChild equals %d\n", makeChild);
-		
-		//if (*clockNano % 10 == 0)
-			//printf("OSS time: %d:%d\n", *clockSeconds, *clockNano);
 
 		//increment clock
 		//waitpid to see if a child has ended
