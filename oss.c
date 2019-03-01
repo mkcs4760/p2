@@ -80,10 +80,10 @@ int main(int argc, char *argv[]) {
 						//WRITE STUFF HERE BEFORE YOU SUBMIT!!
 						exit(0);
 						break;
-			case 'n' :	maxKidsTotal = *optarg;
+			case 'n' :	maxKidsTotal = atoi(optarg);
 						break;
-			case 's' :	if (*optarg < 20) {
-							maxKidsAtATime = *optarg;
+			case 's' :	if (atoi(optarg) <= 20) {
+							maxKidsAtATime = atoi(optarg);
 						}
 						else {
 							perror("Cannot allow more then 20 process at a time.");
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	
-	
+	printf("Our values are %s : %s : %d : %d\n", inputFileName, outputFileName, maxKidsTotal, maxKidsAtATime);
 	
 	//open input file
 	FILE *input;
