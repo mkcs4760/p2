@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[]) {
 	
-	//printf("%s\n", argv[1]); //proof of concept, that the argument passes over
+	printf("%s\n", argv[1]); //proof of concept, that the argument passes over
 	
 	int shmid;
 	key_t key;
@@ -36,6 +36,9 @@ int main(int argc, char *argv[]) {
 	//while(*clockSeconds != 2) {
 	//	printf("User time: %d:%d\n", *clockSeconds, *clockNano);		
 	//}
+	sleep(1);
+	
+	printf("child ends\n");
 	
 	return 0;
 }

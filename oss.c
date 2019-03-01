@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <ctype.h>
 
 int shmid;
 
@@ -49,6 +50,41 @@ static int setupitimer(void) {    /* set ITIMER_PROF for 2-second intervals */
     return (setitimer(ITIMER_PROF, &value, NULL));
 }
 
+//a function to check if string contains ending whitespace, and if so remove it
+void removeSpaces(char* s) {
+	int length = strlen(s);
+	char test = s[length - 1];
+	if (isspace(test)) {
+		s[strlen(s)-1] = '\0'; //remove ending whitespace
+	}
+}
+
+//a function designed to read a line containing a single number and process it
+int readOneNumber(FILE *input, char programName[100]) {
+	char line[100];
+	char *token;
+	fgets(line, 100, input);
+	if (line[0] == '\0') { //if there are no more lines, then we have an error
+		errno = 1;
+		perror("Error reading in one number");
+		//errorMessage(programName, "Invalid input file format. Expected more lines then read. ");
+	}
+	token = strtok(line, " "); //read in a single numer
+	removeSpaces(token); //remove any hanging whitespace
+	int ourValue = atoi(token);
+	if ((token = strtok(NULL, " ")) != NULL) { //check if there is anything after this number
+		if (token[0] == '\n') { //if what remains is just new line character, no problem
+			return ourValue;
+		}
+		else {
+			return -1; //else, the function failed and -1 is returned
+		}
+	}
+	else {
+		return ourValue;
+	}
+}
+
 
 int main(int argc, char *argv[]) {
 	//set up 2 second timer first thing
@@ -63,15 +99,18 @@ int main(int argc, char *argv[]) {
 	
 	char inputFileName[] = "input.txt";
 	char outputFileName[] = "output.txt";
-	int maxKidsTotal = 4;
-	int maxKidsAtATime = 2;
+	int maxKidsTotal = 6;
+	int maxKidsAtATime = 6;
 	
-	//need to add code to allow us to print program name in error messages
-	
-	//process getopt arguments
-	
+	//this section of code allows us to print the program name in error messages
+	char programName[100];
+	strcpy(programName, argv[0]);
+	//printf("%s\n", programName);
+	if (programName[0] == '.' && programName[1] == '/') {
+		memmove(programName, programName + 2, strlen(programName));
+	}
 
-	
+	//first we process the getopt arguments
 	int option;
 	while ((option = getopt(argc, argv, "hn:s:i:o:")) != -1) {
 		switch (option) {
@@ -114,17 +153,13 @@ int main(int argc, char *argv[]) {
 	printf("Opened file %s\n", inputFileName);
 		
 	
-	
-	
-	
-	
-	
-	
+
 	printf("Begin the oss code\n");
 	//int shmid;
 	key_t key;
 	int *clockSeconds, *clockNano;
-	long clockInc = 10001; //just as an example. Will eventually read from input file
+	long clockInc = readOneNumber(input, programName); //10001; //just as an example. Will eventually read from input file
+	printf("increment equals %ld\n", clockInc);
 	
 	key = 9876;
 	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
@@ -143,12 +178,12 @@ int main(int argc, char *argv[]) {
 
 	*clockSeconds = 0;
 	*clockNano = 0;
-	int makeChild = 10000; //sample trigger, let's us know if we need to fork off another child or not
-	//sleep(0.5);
+	int numKidsRunning = 0;
+	int numKidsDone = 0;
 	printf("Hello from OSS!\n");
 	//int status;
 	int temp;
-	while(makeChild > 0) { //simulated clock is incremented by parent
+	while(numKidsDone < maxKidsTotal) { //simulated clock is incremented by parent
 
 		//increment clock
 		//waitpid to see if a child has ended
@@ -160,27 +195,59 @@ int main(int argc, char *argv[]) {
 			*clockSeconds += 1;
 			*clockNano -= 1000000000;
 		}
-		
-		temp = waitpid(0, NULL, WNOHANG);
-		//printf("temp equals %d\n", temp);
+		temp = waitpid(-1, NULL, WNOHANG);
+		//if a child has ended, return pid
+		//if children are running, return 0
+		//if no children are running, return -1
+		//if (temp != 0) {
+		//	printf("temp equals %d\n", temp);
+		//}
 		if (temp > 0) {
-			//printf("A child has ended\n");
-			makeChild -= 1;
+			numKidsDone += 1;
+			numKidsRunning -= 1;
 		}
-		if (temp > 0 || temp < 0){ //if a child has ended or if no child is running
-			if (makeChild > 0) {
-				//printf("Lets make a child!\n");
-				//makeChild -= 1;
+		
+		//printf("%d : %d\n", (numKidsDone < maxKidsTotal), (numKidsRunning < maxKidsAtATime));
+		if (((numKidsDone + numKidsRunning) < maxKidsTotal) && (numKidsRunning < maxKidsAtATime)) { //if you still have kids to run and there's room to run them
+				printf("Lets make a child!\n");
 				pid_t pid;
 				pid = fork();
 				
 				if (pid == 0) { //child
+					//for the sake of experiment, we're not going to exec here - just experiment
 					execl ("user", "user", "200", NULL);
 					//execl ("hw", "hw", NULL); //hello world program, used for testing
 					perror("Error, execl function failed: ");
 					exit(1);
 				}
 				else if (pid > 0) {
+					numKidsRunning += 1;
+					continue;
+				}	
+		}
+		
+		/*
+		if (temp > 0) {
+			printf("A child has ended\n");
+			numKidsRunning -= 1;
+			numKidsDone += 1;
+		}
+		if (temp > 0 || temp < 0){ //if a child has ended or if no child is running
+			//printf("We have %d out of possible %d kids running\n", numKidsRunning, maxKidsAtATime);
+			if ((numKidsRunning < maxKidsAtATime) && (numKidsDone < maxKidsTotal)) {
+				printf("Lets make a child!\n");
+				pid_t pid;
+				pid = fork();
+				
+				if (pid == 0) { //child
+					//for the sake of experiment, we're not going to exec here - just experiment
+					//execl ("user", "user", "200", NULL);
+					//execl ("hw", "hw", NULL); //hello world program, used for testing
+					perror("Error, execl function failed: ");
+					exit(1);
+				}
+				else if (pid > 0) {
+					numKidsRunning += 1;
 					continue;
 				}
 				else {
@@ -190,11 +257,17 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		if (temp < 0) {
-			//perror("waitpid");
-			//exit(1);
+			perror("waitpid");
+			exit(1);
 			printf("No more children to make...\n");
 		}
+		if (temp == 0) {
+			//printf("Somehow we made it here \n");
+		}
+		*/
 	}
+	
+	printf("We made %d out of %d children!!\n", numKidsDone, maxKidsTotal);
 	
 	
 	//destroy shared memory
