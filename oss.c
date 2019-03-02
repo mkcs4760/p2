@@ -1,6 +1,8 @@
-//current version does the following
-//Runs 10 children, then parent terminates
-//next step I believe is to add mandatory 2 second cutoff
+//everything seems to work save the 2 second timer... not always...
+//also need to add in proper error message code
+//also add in output file portion
+//also verify everything is being correctly printed to the correct output
+//also test a bunch
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,17 +35,17 @@ static void myhandler(int s) {
 		exit(1);
 	}
    
-   kill(-1*getpid(), SIGKILL);
+    kill(-1*getpid(), SIGKILL); //doesn't always kill right away
 }
 //function taken from textbook as instructed by professor
-static int setupinterrupt(void) {          /* set up myhandler for  SIGPROF */
+static int setupinterrupt(void) { //set up myhandler for  SIGPROF
     struct sigaction act;
     act.sa_handler = myhandler;
     act.sa_flags = 0;
     return (sigemptyset(&act.sa_mask) || sigaction(SIGPROF, &act, NULL));
 }
 //function taken from textbook as instructed by professor
-static int setupitimer(void) {    /* set ITIMER_PROF for 2-second intervals */
+static int setupitimer(void) { // set ITIMER_PROF for 2-second intervals
     struct itimerval value;
     value.it_interval.tv_sec = 2;
     value.it_interval.tv_usec = 0;
@@ -106,7 +108,6 @@ int main(int argc, char *argv[]) {
 	//this section of code allows us to print the program name in error messages
 	char programName[100];
 	strcpy(programName, argv[0]);
-	//printf("%s\n", programName);
 	if (programName[0] == '.' && programName[1] == '/') {
 		memmove(programName, programName + 2, strlen(programName));
 	}
@@ -120,13 +121,13 @@ int main(int argc, char *argv[]) {
 						//WRITE STUFF HERE BEFORE YOU SUBMIT!!
 						exit(0);
 						break;
-			case 'n' :	maxKidsTotal = atoi(optarg);
+			case 'n' :	maxKidsTotal = atoi(optarg); //for n, we set the maximum number of children we will fork
 						break;
-			case 's' :	if (atoi(optarg) <= 20) {
+			case 's' :	if (atoi(optarg) <= 19) { //for s, we set the maximum of child processes we will have at a time
 							maxKidsAtATime = atoi(optarg);
 						}
 						else {
-							perror("Cannot allow more then 20 process at a time.");
+							perror("Cannot allow more then 19 process at a time."); //the parent is running, so there's already 1 process running
 							exit(1);
 						}
 						break;
@@ -140,9 +141,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	
-	
-	printf("Our values are %s : %s : %d : %d\n", inputFileName, outputFileName, maxKidsTotal, maxKidsAtATime);
-	
 	//open input file
 	FILE *input;
 	input = fopen(inputFileName, "r");
@@ -151,11 +149,7 @@ int main(int argc, char *argv[]) {
 		perror("Can't open file");
 		exit(1);
 	}
-	printf("Opened file %s\n", inputFileName);
-		
-	
 
-	printf("Begin the oss code\n");
 	//int shmid;
 	key_t key;
 	int *clockSeconds, *clockNano;
@@ -177,9 +171,6 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	
-	//readLine(input, /*output,*/ programName);
-	
 	*clockSeconds = 0;
 	*clockNano = 0;
 	int numKidsRunning = 0;
@@ -194,8 +185,6 @@ int main(int argc, char *argv[]) {
 	//int status;
 	int temp;
 	while((numKidsDone < maxKidsTotal) && !((numKidsRunning == 0) && endOfFile)) { //simulated clock is incremented by parent
-		//printf("We have %d kids running and EOF equals %d\n", numKidsRunning, endOfFile);
-		
 		//increment clock
 		//waitpid to see if a child has ended
 		//if (child has ended)
@@ -210,125 +199,69 @@ int main(int argc, char *argv[]) {
 		//if a child has ended, return pid
 		//if children are running, return 0
 		//if no children are running, return -1
-		//if (temp != 0) {
-		//	printf("temp equals %d\n", temp);
-		//}
 		if (temp > 0) { //a child has ended
 			//write to output file the time this process ended
 			printf("Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
-			
 			numKidsDone += 1;
 			numKidsRunning -= 1;
 		}
-		
-		//printf("%d : %d\n", (numKidsDone < maxKidsTotal), (numKidsRunning < maxKidsAtATime));
 		if (((numKidsDone + numKidsRunning) < maxKidsTotal) && (numKidsRunning < maxKidsAtATime)) { //if you still have kids to run and there's room to run them
-				//printf("Lets make a child!\n");
-				
-				//let's try reading the file here
-				
-				if (lineWaiting == false) {
-					char line[100];
-					lineWaiting = true;
-					counter = 0;
-					char *value = fgets(line, 100, input); //get line of numbers
-					//printf("Line equals <%s>\n", line);
-					//printf("fgets equals %s\n", value);
-					//char *endTest = strstr(line, '\0');
-					if (value == NULL) { //weak security, but it'll do for now !!!!!!!!!!!!!!!! 
-						//if there are no more lines, then we have an error
-						//errno = 1;
-						//errorMessage(programName, "Invalid input file format. Expected more lines then read. ");
-						perror("EOF reached\n");
-						endOfFile = true;
-					}
-					else {
-						token = strtok(line, " ");
-						while (token != NULL && token[0] != '\n' && counter < 3) {
-							singleNum = atoi(token);
-							//printf("%d\n", singleNum);
-							fullLine[counter] = singleNum;
-							//printf("%d\n", fullLine[counter]);
-							counter++;
-							token = strtok(NULL, " ");
-						}
-					}
-				
-					//what if there are too many numbers?
-					//what if there are too few numbers?
-				}
-				
-				if (endOfFile == false) {
-					
-					if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
-						//printf("It's time to make a child\n");
-						lineWaiting = false;
-						pid_t pid;
-						pid = fork();
-					
-						if (pid == 0) { //child
-							//for the sake of experiment, we're not going to exec here - just experiment
-							char buffer[11];
-							//itoa(fullLine[2], buffer, 10); 
-							sprintf(buffer, "%d", fullLine[2]);
-							execl ("user", "user", buffer, NULL);
-							//execl ("hw", "hw", NULL); //hello world program, used for testing
-							perror("Error, execl function failed: ");
-							exit(1);
-						}
-						else if (pid > 0) {
-							numKidsRunning += 1;
-							//write to output file the time this process was launched
-							printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
-							continue;
-						}
-					}
-				}
-		}
-		
-		/*
-		if (temp > 0) {
-			printf("A child has ended\n");
-			numKidsRunning -= 1;
-			numKidsDone += 1;
-		}
-		if (temp > 0 || temp < 0){ //if a child has ended or if no child is running
-			//printf("We have %d out of possible %d kids running\n", numKidsRunning, maxKidsAtATime);
-			if ((numKidsRunning < maxKidsAtATime) && (numKidsDone < maxKidsTotal)) {
-				printf("Lets make a child!\n");
-				pid_t pid;
-				pid = fork();
-				
-				if (pid == 0) { //child
-					//for the sake of experiment, we're not going to exec here - just experiment
-					//execl ("user", "user", "200", NULL);
-					//execl ("hw", "hw", NULL); //hello world program, used for testing
-					perror("Error, execl function failed: ");
-					exit(1);
-				}
-				else if (pid > 0) {
-					numKidsRunning += 1;
-					continue;
+			if (lineWaiting == false) {
+				char line[100];
+				lineWaiting = true;
+				counter = 0;
+				char *value = fgets(line, 100, input); //get line of numbers
+				//printf("Line equals <%s>\n", line);
+				//printf("fgets equals %s\n", value);
+				//char *endTest = strstr(line, '\0');
+				if (value == NULL) { //weak security, but it'll do for now !!!!!!!!!!!!!!!! 
+					//if there are no more lines, then we have an error
+					//errno = 1;
+					//errorMessage(programName, "Invalid input file format. Expected more lines then read. ");
+					perror("EOF reached");
+					endOfFile = true;
 				}
 				else {
-					perror("Error, could not fork child: ");
-					exit(1);
-				}				
+					token = strtok(line, " ");
+					while (token != NULL && token[0] != '\n' && counter < 3) {
+						singleNum = atoi(token);
+						//printf("%d\n", singleNum);
+						fullLine[counter] = singleNum;
+						//printf("%d\n", fullLine[counter]);
+						counter++;
+						token = strtok(NULL, " ");
+					}
+				}
+				
+				//what if there are too many numbers?
+				//what if there are too few numbers?
+			}
+				
+			if (endOfFile == false) {
+					
+				if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
+					//it's time to make a child
+					lineWaiting = false;
+					pid_t pid;
+					pid = fork();
+					
+					if (pid == 0) { //child
+						char buffer[11];
+						sprintf(buffer, "%d", fullLine[2]);
+						execl ("user", "user", buffer, NULL);
+						perror("Error, execl function failed: ");
+						exit(1);
+					}
+					else if (pid > 0) {
+						numKidsRunning += 1;
+						//write to output file the time this process was launched
+						printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
+						continue;
+					}
+				}
 			}
 		}
-		if (temp < 0) {
-			perror("waitpid");
-			exit(1);
-			printf("No more children to make...\n");
-		}
-		if (temp == 0) {
-			//printf("Somehow we made it here \n");
-		}
-		*/
 	}
-	
-	printf("We made %d out of %d children!!\n", numKidsDone, maxKidsTotal);
-	
 	
 	//destroy shared memory
 	printf("clock time equals %d:%d\n", *clockSeconds, *clockNano);
