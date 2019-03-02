@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 	
 	char inputFileName[] = "input.txt";
 	char outputFileName[] = "output.txt";
-	int maxKidsTotal = 4;
+	int maxKidsTotal = 10;
 	int maxKidsAtATime = 2;
 	
 	//this section of code allows us to print the program name in error messages
@@ -189,11 +189,13 @@ int main(int argc, char *argv[]) {
 	int singleNum;
 	int fullLine[3];
 	char* token;
+	bool endOfFile = false;
 	printf("Hello from OSS!\n");
 	//int status;
 	int temp;
-	while(numKidsDone < maxKidsTotal) { //simulated clock is incremented by parent
-
+	while((numKidsDone < maxKidsTotal) && !((numKidsRunning == 0) && endOfFile)) { //simulated clock is incremented by parent
+		//printf("We have %d kids running and EOF equals %d\n", numKidsRunning, endOfFile);
+		
 		//increment clock
 		//waitpid to see if a child has ended
 		//if (child has ended)
@@ -212,6 +214,9 @@ int main(int argc, char *argv[]) {
 		//	printf("temp equals %d\n", temp);
 		//}
 		if (temp > 0) { //a child has ended
+			//write to output file the time this process ended
+			printf("Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
+			
 			numKidsDone += 1;
 			numKidsRunning -= 1;
 		}
@@ -226,40 +231,57 @@ int main(int argc, char *argv[]) {
 					char line[100];
 					lineWaiting = true;
 					counter = 0;
-					fgets(line, 100, input); //get line of numbers
-					token = strtok(line, " ");
-					while (token != NULL && token[0] != '\n' && counter < 3) {
-						singleNum = atoi(token);
-						//printf("%d\n", singleNum);
-						fullLine[counter] = singleNum;
-						//printf("%d\n", fullLine[counter]);
-						counter++;
-						token = strtok(NULL, " ");
+					char *value = fgets(line, 100, input); //get line of numbers
+					//printf("Line equals <%s>\n", line);
+					//printf("fgets equals %s\n", value);
+					//char *endTest = strstr(line, '\0');
+					if (value == NULL) { //weak security, but it'll do for now !!!!!!!!!!!!!!!! 
+						//if there are no more lines, then we have an error
+						//errno = 1;
+						//errorMessage(programName, "Invalid input file format. Expected more lines then read. ");
+						perror("EOF reached\n");
+						endOfFile = true;
+					}
+					else {
+						token = strtok(line, " ");
+						while (token != NULL && token[0] != '\n' && counter < 3) {
+							singleNum = atoi(token);
+							//printf("%d\n", singleNum);
+							fullLine[counter] = singleNum;
+							//printf("%d\n", fullLine[counter]);
+							counter++;
+							token = strtok(NULL, " ");
+						}
 					}
 				
 					//what if there are too many numbers?
 					//what if there are too few numbers?
 				}
 				
-				if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
-					//printf("It's time to make a child\n");
-					lineWaiting = false;
-					pid_t pid;
-					pid = fork();
-				
-					if (pid == 0) { //child
-						//for the sake of experiment, we're not going to exec here - just experiment
-						char buffer[11];
-						//itoa(fullLine[2], buffer, 10); 
-						sprintf(buffer, "%d", fullLine[2]);
-						execl ("user", "user", buffer, NULL);
-						//execl ("hw", "hw", NULL); //hello world program, used for testing
-						perror("Error, execl function failed: ");
-						exit(1);
-					}
-					else if (pid > 0) {
-						numKidsRunning += 1;
-						continue;
+				if (endOfFile == false) {
+					
+					if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
+						//printf("It's time to make a child\n");
+						lineWaiting = false;
+						pid_t pid;
+						pid = fork();
+					
+						if (pid == 0) { //child
+							//for the sake of experiment, we're not going to exec here - just experiment
+							char buffer[11];
+							//itoa(fullLine[2], buffer, 10); 
+							sprintf(buffer, "%d", fullLine[2]);
+							execl ("user", "user", buffer, NULL);
+							//execl ("hw", "hw", NULL); //hello world program, used for testing
+							perror("Error, execl function failed: ");
+							exit(1);
+						}
+						else if (pid > 0) {
+							numKidsRunning += 1;
+							//write to output file the time this process was launched
+							printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
+							continue;
+						}
 					}
 				}
 		}
