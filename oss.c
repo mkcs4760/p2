@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 						singleNum = atoi(token);
 						//printf("%d\n", singleNum);
 						fullLine[counter] = singleNum;
-						printf("%d\n", fullLine[counter]);
+						//printf("%d\n", fullLine[counter]);
 						counter++;
 						token = strtok(NULL, " ");
 					}
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
 				}
 				
 				if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
-					printf("It's time to make a child\n");
+					//printf("It's time to make a child\n");
 					lineWaiting = false;
 					pid_t pid;
 					pid = fork();

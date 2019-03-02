@@ -8,8 +8,6 @@
 
 int main(int argc, char *argv[]) {
 	
-	printf("%s\n", argv[1]); //proof of concept, that the argument passes over
-	
 	int shmid;
 	key_t key;
 
@@ -32,13 +30,25 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 	
-	//printf("Hello from user! We're at time %d:%d\n", *clockSeconds, *clockNano);
-	//while(*clockSeconds != 2) {
-	//	printf("User time: %d:%d\n", *clockSeconds, *clockNano);		
-	//}
-	sleep(1);
+	int startSeconds = *clockSeconds;
+	int startNano = *clockNano;
+	int stopSeconds;
+	int stopNano;
+	//printf("Child starts at %d:%d\n", startSeconds, startNano);
+	int duration = atoi(argv[1]);
+	//printf("Child needs to last %d\n", duration);
 	
-	printf("child ends\n");
+	stopSeconds = startSeconds;
+	stopNano = startNano + duration;
+	if (stopNano >= 1000000000) {
+		stopSeconds += 1;
+		stopNano -= 1000000000;
+	}
+
+	while((*clockSeconds < stopSeconds) || ((*clockSeconds == stopSeconds) && (*clockNano < stopNano)));
+	//wait for the correct duration
+	printf("Child %d - %d:%d - Terminating\n", getpid(), *clockSeconds, *clockNano);
+	
 	
 	return 0;
 }
