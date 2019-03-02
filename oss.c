@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 int shmid;
 
@@ -99,8 +100,8 @@ int main(int argc, char *argv[]) {
 	
 	char inputFileName[] = "input.txt";
 	char outputFileName[] = "output.txt";
-	int maxKidsTotal = 6;
-	int maxKidsAtATime = 6;
+	int maxKidsTotal = 4;
+	int maxKidsAtATime = 2;
 	
 	//this section of code allows us to print the program name in error messages
 	char programName[100];
@@ -176,10 +177,18 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	
+	//readLine(input, /*output,*/ programName);
+	
 	*clockSeconds = 0;
 	*clockNano = 0;
 	int numKidsRunning = 0;
 	int numKidsDone = 0;
+	bool lineWaiting = false;
+	int counter = 0;
+	int singleNum;
+	int fullLine[3];
+	char* token;
 	printf("Hello from OSS!\n");
 	//int status;
 	int temp;
@@ -202,28 +211,57 @@ int main(int argc, char *argv[]) {
 		//if (temp != 0) {
 		//	printf("temp equals %d\n", temp);
 		//}
-		if (temp > 0) {
+		if (temp > 0) { //a child has ended
 			numKidsDone += 1;
 			numKidsRunning -= 1;
 		}
 		
 		//printf("%d : %d\n", (numKidsDone < maxKidsTotal), (numKidsRunning < maxKidsAtATime));
 		if (((numKidsDone + numKidsRunning) < maxKidsTotal) && (numKidsRunning < maxKidsAtATime)) { //if you still have kids to run and there's room to run them
-				printf("Lets make a child!\n");
-				pid_t pid;
-				pid = fork();
+				//printf("Lets make a child!\n");
 				
-				if (pid == 0) { //child
-					//for the sake of experiment, we're not going to exec here - just experiment
-					execl ("user", "user", "200", NULL);
-					//execl ("hw", "hw", NULL); //hello world program, used for testing
-					perror("Error, execl function failed: ");
-					exit(1);
+				//let's try reading the file here
+				
+				if (lineWaiting == false) {
+					char line[100];
+					lineWaiting = true;
+					counter = 0;
+					fgets(line, 100, input); //get line of numbers
+					token = strtok(line, " ");
+					while (token != NULL && token[0] != '\n' && counter < 3) {
+						singleNum = atoi(token);
+						//printf("%d\n", singleNum);
+						fullLine[counter] = singleNum;
+						printf("%d\n", fullLine[counter]);
+						counter++;
+						token = strtok(NULL, " ");
+					}
+				
+					//what if there are too many numbers?
+					//what if there are too few numbers?
 				}
-				else if (pid > 0) {
-					numKidsRunning += 1;
-					continue;
-				}	
+				
+				if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
+					printf("It's time to make a child\n");
+					lineWaiting = false;
+					pid_t pid;
+					pid = fork();
+				
+					if (pid == 0) { //child
+						//for the sake of experiment, we're not going to exec here - just experiment
+						char buffer[11];
+						//itoa(fullLine[2], buffer, 10); 
+						sprintf(buffer, "%d", fullLine[2]);
+						execl ("user", "user", buffer, NULL);
+						//execl ("hw", "hw", NULL); //hello world program, used for testing
+						perror("Error, execl function failed: ");
+						exit(1);
+					}
+					else if (pid > 0) {
+						numKidsRunning += 1;
+						continue;
+					}
+				}
 		}
 		
 		/*
