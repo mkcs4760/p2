@@ -1,7 +1,4 @@
 //everything seems to work save the 2 second timer... not always...
-//also need to add in proper error message code
-//also add in output file portion
-//also verify everything is being correctly printed to the correct output
 //also test a bunch
 
 #include <stdio.h>
@@ -53,6 +50,21 @@ static int setupitimer(void) { // set ITIMER_PROF for 2-second intervals
     return (setitimer(ITIMER_PROF, &value, NULL));
 }
 
+//takes in program name and error string, and runs error message procedure
+void errorMessage(char programName[100], char errorString[100]){
+	char errorFinal[200];
+	sprintf(errorFinal, "%s : Error : %s", programName, errorString);
+	perror(errorFinal);
+	
+	//destroy shared memory
+	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+	if (ctl_return == -1) {
+		perror("shmctl for removel: ");
+		exit(1);
+	}
+	kill(-1*getpid(), SIGKILL);
+}
+
 //a function to check if string contains ending whitespace, and if so remove it
 void removeSpaces(char* s) {
 	int length = strlen(s);
@@ -90,27 +102,27 @@ int readOneNumber(FILE *input, char programName[100]) {
 
 
 int main(int argc, char *argv[]) {
-	//set up 2 second timer first thing
-    if (setupinterrupt()) {
-		perror("Failed to set up handler for SIGPROF");
-		return 1;
-    }
-    if (setupitimer() == -1) {
-		perror("Failed to set up the ITIMER_PROF interval timer"); 
-		return 1;
-    }
-	
-	char inputFileName[] = "input.txt";
-	char outputFileName[] = "output.txt";
-	int maxKidsTotal = 10;
-	int maxKidsAtATime = 2;
-	
 	//this section of code allows us to print the program name in error messages
 	char programName[100];
 	strcpy(programName, argv[0]);
 	if (programName[0] == '.' && programName[1] == '/') {
 		memmove(programName, programName + 2, strlen(programName));
 	}
+	
+	//set up 2 second timer
+    if (setupinterrupt()) {
+		errno = 125;
+		errorMessage(programName, "Failed to set up 2 second timer. ");
+    }
+    if (setupitimer() == -1) {
+		errno = 125;
+		errorMessage(programName, "Failed to set up 2 second timer. ");
+    }
+	
+	char inputFileName[] = "input.txt";
+	char outputFileName[] = "output.txt";
+	int maxKidsTotal = 10;
+	int maxKidsAtATime = 2;
 
 	//first we process the getopt arguments
 	int option;
@@ -136,8 +148,7 @@ int main(int argc, char *argv[]) {
 			case 'o' :	strcpy(outputFileName, optarg); //for o, we specify output file name
 						break;
 			default :	errno = 22; //anything else is an invalid argument
-						perror("You entered an invalid argument");
-						exit(1);
+						errorMessage(programName, "You entered an invalid argument. ");
 		}
 	}
 	
@@ -145,30 +156,26 @@ int main(int argc, char *argv[]) {
 	FILE *input;
 	input = fopen(inputFileName, "r");
 	if (input == NULL) {
-		printf("Can't open file %s\n", inputFileName);
-		perror("Can't open file");
-		exit(1);
+		errno = 2;
+		errorMessage(programName, "Cannot open desired file. ");
 	}
 
 	//int shmid;
 	key_t key;
 	int *clockSeconds, *clockNano;
 	long clockInc = readOneNumber(input, programName); //10001; //just as an example. Will eventually read from input file
-	printf("increment equals %ld\n", clockInc);
 	
 	key = 9876;
 	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
 	if(shmid < 0) {
-		perror("shmget oss side");
-		exit(1);
+		errorMessage(programName, "Function shmget failed. ");
 	}
 	
 	//attach ourselves to that shared memory
 	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 numbers in shared memory
 	clockNano = clockSeconds + 1;
 	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
-		perror("shmat");
-		exit(1);
+		errorMessage(programName, "Function shmat failed. ");
 	}
 
 	*clockSeconds = 0;
@@ -181,9 +188,11 @@ int main(int argc, char *argv[]) {
 	int fullLine[3];
 	char* token;
 	bool endOfFile = false;
-	printf("Hello from OSS!\n");
 	//int status;
 	int temp;
+	FILE *output;
+	output = fopen(outputFileName, "w");
+	//loop until we're done
 	while((numKidsDone < maxKidsTotal) && !((numKidsRunning == 0) && endOfFile)) { //simulated clock is incremented by parent
 		//increment clock
 		//waitpid to see if a child has ended
@@ -201,7 +210,8 @@ int main(int argc, char *argv[]) {
 		//if no children are running, return -1
 		if (temp > 0) { //a child has ended
 			//write to output file the time this process ended
-			printf("Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
+			//printf("Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
+			fprintf(output, "Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
 			numKidsDone += 1;
 			numKidsRunning -= 1;
 		}
@@ -211,28 +221,19 @@ int main(int argc, char *argv[]) {
 				lineWaiting = true;
 				counter = 0;
 				char *value = fgets(line, 100, input); //get line of numbers
-				//printf("Line equals <%s>\n", line);
-				//printf("fgets equals %s\n", value);
-				//char *endTest = strstr(line, '\0');
-				if (value == NULL) { //weak security, but it'll do for now !!!!!!!!!!!!!!!! 
-					//if there are no more lines, then we have an error
-					//errno = 1;
-					//errorMessage(programName, "Invalid input file format. Expected more lines then read. ");
-					perror("EOF reached");
+				if (value == NULL) {
+					//if there are no more lines, then we reached the EOF
 					endOfFile = true;
 				}
 				else {
 					token = strtok(line, " ");
 					while (token != NULL && token[0] != '\n' && counter < 3) {
 						singleNum = atoi(token);
-						//printf("%d\n", singleNum);
 						fullLine[counter] = singleNum;
-						//printf("%d\n", fullLine[counter]);
 						counter++;
 						token = strtok(NULL, " ");
 					}
 				}
-				
 				//what if there are too many numbers?
 				//what if there are too few numbers?
 			}
@@ -255,7 +256,8 @@ int main(int argc, char *argv[]) {
 					else if (pid > 0) {
 						numKidsRunning += 1;
 						//write to output file the time this process was launched
-						printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
+						//printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
+						fprintf(output, "Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
 						continue;
 					}
 				}
@@ -263,14 +265,14 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	
+	fclose(output);
+	
 	//destroy shared memory
-	printf("clock time equals %d:%d\n", *clockSeconds, *clockNano);
+	printf("Parent terminating %d:%d\n", *clockSeconds, *clockNano);
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if (ctl_return == -1) {
-		perror("shmctl for removel: ");
-		exit(1);
+		errorMessage(programName, "Function scmctl failed. ");
 	}
-	printf("The parent is now done\n");
 
 	return 0;
 }
