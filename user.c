@@ -13,20 +13,19 @@ int main(int argc, char *argv[]) {
 
 	int *clockSeconds, *clockNano;
 	
+	//connect to shared memory
 	key = 9876;
 	shmid = shmget(key, sizeof(int*) + sizeof(long*), 0666);
-	
 	if(shmid < 0) {
-		perror("shmget user side");
+		perror("Shmget error in user process ");
 		exit(1);
 	}
 	
 	//attach ourselves to that shared memory
 	clockSeconds = shmat(shmid, NULL, 0); //attempting to store 2 numbers in shared memory
 	clockNano = clockSeconds + 1;
-	
 	if((clockSeconds == (int *) -1) || (clockNano == (int *) -1)) {
-		perror("shmat");
+		perror("shmat error in user process");
 		exit(1);
 	}
 	
@@ -34,9 +33,7 @@ int main(int argc, char *argv[]) {
 	int startNano = *clockNano;
 	int stopSeconds;
 	int stopNano;
-	//printf("Child starts at %d:%d\n", startSeconds, startNano);
 	int duration = atoi(argv[1]);
-	//printf("Child needs to last %d\n", duration);
 	
 	stopSeconds = startSeconds;
 	stopNano = startNano + duration;
@@ -48,7 +45,6 @@ int main(int argc, char *argv[]) {
 	while((*clockSeconds < stopSeconds) || ((*clockSeconds == stopSeconds) && (*clockNano < stopNano)));
 	//wait for the correct duration
 	printf("Child %d - %d:%d - Terminating\n", getpid(), *clockSeconds, *clockNano);
-	
 	
 	return 0;
 }

@@ -1,6 +1,3 @@
-//everything seems to work save the 2 second timer... not always...
-//also test a bunch
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +6,6 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 #include <unistd.h> 
-#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -18,6 +14,7 @@
 
 int shmid;
 
+//handles the 2 second timer force stop - based on textbook code as instructed by professor
 static void myhandler(int s) {
     char message[41] = "Program reached 2 second limit. Program ";
     int errsave;
@@ -32,7 +29,7 @@ static void myhandler(int s) {
 		exit(1);
 	}
    
-    kill(-1*getpid(), SIGKILL); //doesn't always kill right away
+    kill(-1*getpid(), SIGKILL); //kills process and all children
 }
 //function taken from textbook as instructed by professor
 static int setupinterrupt(void) { //set up myhandler for  SIGPROF
@@ -121,7 +118,7 @@ int main(int argc, char *argv[]) {
 	
 	char inputFileName[] = "input.txt";
 	char outputFileName[] = "output.txt";
-	int maxKidsTotal = 10;
+	int maxKidsTotal = 4;
 	int maxKidsAtATime = 2;
 
 	//first we process the getopt arguments
@@ -129,8 +126,15 @@ int main(int argc, char *argv[]) {
 	while ((option = getopt(argc, argv, "hn:s:i:o:")) != -1) {
 		switch (option) {
 			case 'h' :	printf("Help page for OS_Klein_project2\n"); //for h, we print data to the screen
-						printf("Blah blah blah write stuff here\n");
-						//WRITE STUFF HERE BEFORE YOU SUBMIT!!
+						printf("Consists of the following:\n\tTwo .c file titled oss.c and user.c\n\tOne Makefile\n\tOne README.md file\n\tOne version control log.\n");
+						printf("The command 'make' will run the makefile and compile the program\n");
+						printf("Command line arguments for oss executable:\n");
+						printf("\t-i\t<inputFileName>\t\tdefaults to input.txt\n");
+						printf("\t-o\t<outputFileName>\tdefaults to output.txt\n");
+						printf("\t-n\t<maxTotalChildren>\tdefaults to 4\n");
+						printf("\t-s\t<maxChildrenAtATime>\tdefaults to 2\n");
+						printf("\t-h\t<NoArgument>\n");
+						printf("Version control acomplished using github. Log obtained using command 'git log > versionLog.txt\n");
 						exit(0);
 						break;
 			case 'n' :	maxKidsTotal = atoi(optarg); //for n, we set the maximum number of children we will fork
@@ -139,8 +143,8 @@ int main(int argc, char *argv[]) {
 							maxKidsAtATime = atoi(optarg);
 						}
 						else {
-							perror("Cannot allow more then 19 process at a time."); //the parent is running, so there's already 1 process running
-							exit(1);
+							errno = 22;
+							errorMessage(programName, "Cannot allow more then 19 process at a time. "); //the parent is running, so there's already 1 process running
 						}
 						break;
 			case 'i' :	strcpy(inputFileName, optarg); //for i, we specify input file name
@@ -163,9 +167,9 @@ int main(int argc, char *argv[]) {
 	//int shmid;
 	key_t key;
 	int *clockSeconds, *clockNano;
-	long clockInc = readOneNumber(input, programName); //10001; //just as an example. Will eventually read from input file
+	long clockInc = readOneNumber(input, programName);
 	
-	key = 9876;
+	key = 1094;
 	shmid = shmget(key, sizeof(int*) + sizeof(long*), IPC_CREAT | 0666); //this is where we create shared memory
 	if(shmid < 0) {
 		errorMessage(programName, "Function shmget failed. ");
@@ -188,7 +192,6 @@ int main(int argc, char *argv[]) {
 	int fullLine[3];
 	char* token;
 	bool endOfFile = false;
-	//int status;
 	int temp;
 	FILE *output;
 	output = fopen(outputFileName, "w");
@@ -210,13 +213,13 @@ int main(int argc, char *argv[]) {
 		//if no children are running, return -1
 		if (temp > 0) { //a child has ended
 			//write to output file the time this process ended
-			//printf("Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
 			fprintf(output, "Child %d ended at %d:%d\n", temp, *clockSeconds, *clockNano);
 			numKidsDone += 1;
 			numKidsRunning -= 1;
 		}
-		if (((numKidsDone + numKidsRunning) < maxKidsTotal) && (numKidsRunning < maxKidsAtATime)) { //if you still have kids to run and there's room to run them
-			if (lineWaiting == false) {
+		//if you still have kids to run and there's room to run them
+		if (((numKidsDone + numKidsRunning) < maxKidsTotal) && (numKidsRunning < maxKidsAtATime)) {
+			if (lineWaiting == false) { //boolean added to avoid reading same line twice or skipping a line
 				char line[100];
 				lineWaiting = true;
 				counter = 0;
@@ -234,12 +237,8 @@ int main(int argc, char *argv[]) {
 						token = strtok(NULL, " ");
 					}
 				}
-				//what if there are too many numbers?
-				//what if there are too few numbers?
 			}
-				
 			if (endOfFile == false) {
-					
 				if ((*clockSeconds > fullLine[0]) || ((*clockSeconds == fullLine[0]) && (*clockNano >= fullLine[1]))) {
 					//it's time to make a child
 					lineWaiting = false;
@@ -250,13 +249,11 @@ int main(int argc, char *argv[]) {
 						char buffer[11];
 						sprintf(buffer, "%d", fullLine[2]);
 						execl ("user", "user", buffer, NULL);
-						perror("Error, execl function failed: ");
-						exit(1);
+						errorMessage(programName, "execl function failed. ");
 					}
-					else if (pid > 0) {
+					else if (pid > 0) { //parent
 						numKidsRunning += 1;
 						//write to output file the time this process was launched
-						//printf("Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
 						fprintf(output, "Created child %d at %d:%d to last %d\n", pid, *clockSeconds, *clockNano, fullLine[2]);
 						continue;
 					}
@@ -264,7 +261,6 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
-	
 	fclose(output);
 	
 	//destroy shared memory
